@@ -238,16 +238,48 @@ def publish_to_tistory(title, content):
             # 5. Enter Content
             print("Entering content...")
             try:
-                editor_area = page.locator('.CodeMirror-scroll').first
-                editor_area.click(timeout=5000)
+                # CodeMirror uses a hidden textarea for input handling
+                textarea = page.locator('.CodeMirror textarea')
+                textarea.focus(timeout=5000)
+                time.sleep(1)
+                
                 # Clear any existing text
                 page.keyboard.press('Control+A')
                 page.keyboard.press('Backspace')
-            except Exception as e:
-                print("CodeMirror not found, falling back to editor-root...")
-                page.locator('#editor-root').first.click()
+                time.sleep(0.5)
                 
-            page.keyboard.insert_text(content)
+                # Insert the markdown content
+                page.keyboard.insert_text(content)
+                print("Successfully entered content into CodeMirror.")
+            except Exception as e:
+                print(f"CodeMirror textarea not found, falling back: {e}")
+                try:
+                    editor_root = page.locator('.ProseMirror').first
+                    editor_root.click()
+                    page.keyboard.press('Control+A')
+                    page.keyboard.press('Backspace')
+                    page.keyboard.insert_text(content)
+                except Exception as e2:
+                    print(f"Fallback failed: {e2}")
+            
+            time.sleep(2)
+            
+            # 5-1. Enter Tags
+            print("Entering tags...")
+            try:
+                tag_input = page.locator('input[placeholder*="태그"]')
+                if tag_input.count() > 0:
+                    tag_input.first.click(timeout=3000)
+                    tags = [keyword.replace(" ", ""), "이슈", "트렌드", "정보", "분석"]
+                    for tag in tags:
+                        tag_input.first.fill(tag)
+                        page.keyboard.press("Enter")
+                        time.sleep(0.5)
+                    print("Successfully entered tags.")
+                else:
+                    print("Tag input field not found.")
+            except Exception as e:
+                print(f"Failed to enter tags: {e}")
             
             # 6. Click Publish
             print("Clicking Publish buttons...")
