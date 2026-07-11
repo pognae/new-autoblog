@@ -122,18 +122,13 @@ def publish_to_tistory(title, content):
                     
                 for c in raw_cookies:
                     # Playwright requires name, value, and either domain or url
+                    # By forcing 'url' to the target blog, we bypass all domain validation issues.
                     new_c = {
-                        'name': c.get('name', ''),
-                        'value': c.get('value', ''),
-                        'path': c.get('path', '/')
+                        'name': str(c.get('name', '')),
+                        'value': str(c.get('value', '')),
+                        'url': 'https://gumdrop.tistory.com',
+                        'path': '/'
                     }
-                    if c.get('domain'):
-                        new_c['domain'] = c['domain']
-                    elif c.get('url'):
-                        new_c['url'] = c['url']
-                    else:
-                        new_c['domain'] = '.tistory.com'
-                        
                     valid_cookies.append(new_c)
                     
                 context.add_cookies(valid_cookies)
