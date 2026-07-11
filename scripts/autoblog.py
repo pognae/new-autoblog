@@ -42,6 +42,28 @@ def get_google_trends_keyword():
         print(f"Failed to extract Google realtime keyword: {e}")
         return "자동 포스팅" # Fallback keyword
 
+def generate_blog_post_gemini(prompt):
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+    if not GEMINI_API_KEY:
+        raise Exception("GEMINI_API_KEY environment variable is not set for fallback.")
+    
+    print("Sending request to Google Gemini API (fallback)...")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.7}
+    }
+    
+    response = requests.post(url, headers=headers, json=payload, timeout=180)
+    response.raise_for_status()
+    data = response.json()
+    try:
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError) as e:
+        print(f"Failed to parse Gemini response: {data}")
+        raise
+
 def generate_blog_post(keyword):
     print(f"Generating post for keyword: {keyword}")
     url = "https://integrate.api.nvidia.com/v1/chat/completions"
@@ -88,12 +110,10 @@ def generate_blog_post(keyword):
         response.raise_for_status()
         data = response.json()
         return data["choices"][0]["message"]["content"]
-    except requests.exceptions.Timeout:
-        print("TimeoutError: NVIDIA NIM API request timed out after 180 seconds.")
-        raise
     except Exception as e:
-        print(f"Error generating post: {e}")
-        raise
+        print(f"NVIDIA API failed or timed out: {e}")
+        print("Falling back to Google Gemini API...")
+        return generate_blog_post_gemini(prompt)
 
 def generate_image_url(keyword):
     # Using Pollinations AI for free text-to-image without API keys
@@ -251,8 +271,8 @@ def publish_to_tistory(title, content):
             browser.close()
 
 def main():
-    if not NVIDIA_API_KEY:
-        print("Error: NVIDIA_API_KEY environment variable is not set.")
+    if not NVIDIA_API_KEY and not os.environ.get("GEMINI_API_KEY"):
+        print("Error: Neither NVIDIA_API_KEY nor GEMINI_API_KEY environment variables are set.")
         sys.exit(1)
 
     # 1. Get Keyword
