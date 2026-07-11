@@ -2,10 +2,15 @@ import os
 import time
 import json
 import requests
+import sys
 from datetime import datetime
 from pytrends.request import TrendReq
+from playwright.sync_api import sync_playwright
 
 NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY")
+KAKAO_EMAIL = os.environ.get("KAKAO_EMAIL")
+KAKAO_PASSWORD = os.environ.get("KAKAO_PASSWORD")
+TISTORY_COOKIES = os.environ.get("TISTORY_COOKIES")
 
 def get_google_trends_keyword():
     try:
@@ -76,10 +81,116 @@ def generate_image_url(keyword):
     url = f"https://pollinations.ai/p/{encoded_keyword}?width=800&height=400&nologo=true"
     return url
 
+def publish_to_tistory(title, content):
+    if not TISTORY_COOKIES and (not KAKAO_EMAIL or not KAKAO_PASSWORD):
+        print("Error: Either TISTORY_COOKIES or KAKAO credentials must be set.")
+        sys.exit(1)
+        
+    print("Starting Playwright to publish on Tistory...")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            locale="ko-KR"
+        )
+        
+        # Inject cookies if provided (Bypasses Login and Captchas completely)
+        if TISTORY_COOKIES:
+            print("Injecting Tistory cookies for authentication...")
+            try:
+                cookies = json.loads(TISTORY_COOKIES)
+                # Ensure the url or domain is properly formatted for Playwright
+                for cookie in cookies:
+                    if 'url' not in cookie:
+                        cookie['url'] = 'https://' + cookie['domain'].lstrip('.')
+                context.add_cookies(cookies)
+            except Exception as e:
+                print(f"Failed to parse TISTORY_COOKIES JSON. Error: {e}")
+                sys.exit(1)
+                
+        page = context.new_page()
+        
+        try:
+            # 1. Login (Only if no cookies are provided)
+            if not TISTORY_COOKIES:
+                print("Navigating to Tistory login...")
+                page.goto("https://www.tistory.com/auth/login")
+                page.get_by_text("카카오계정 로그인").click()
+                
+                print("Entering Kakao credentials...")
+                page.wait_for_selector('input[name="loginId"]', timeout=10000)
+                page.fill('input[name="loginId"]', KAKAO_EMAIL)
+                page.fill('input[name="password"]', KAKAO_PASSWORD)
+                page.click('.btn_g.highlight.submit')
+                
+                print("Waiting for login completion...")
+                page.wait_for_load_state('networkidle')
+                time.sleep(3)
+            
+            # 2. Go to Write Page
+            print("Navigating to the write page...")
+            page.goto("https://gumdrop.tistory.com/manage/post")
+            page.wait_for_load_state('networkidle')
+            time.sleep(3) # Wait for editor to load
+            
+            # Check if login was successful
+            if "login" in page.url:
+                print("Error: Redirected to login page. Authentication failed! Check cookies or credentials.")
+                sys.exit(1)
+            
+            # Handle possible popup alerts ("임시 저장된 글이 있습니다" 등)
+            page.on("dialog", lambda dialog: dialog.dismiss())
+            
+            # 3. Enter Title
+            print("Entering title...")
+            page.get_by_placeholder("제목을 입력하세요").fill(title)
+            
+            # 4. Switch to Markdown mode
+            print("Switching to Markdown mode...")
+            try:
+                mode_btn = page.locator('button:has-text("기본모드")').first
+                if mode_btn.is_visible():
+                    mode_btn.click(timeout=5000)
+                    page.locator('button:has-text("마크다운")').first.click(timeout=5000)
+                    page.on("dialog", lambda dialog: dialog.accept())
+            except Exception as e:
+                print(f"Could not switch to Markdown via menu: {e}")
+            
+            # 5. Enter Content
+            print("Entering content...")
+            editor_area = page.locator('.CodeMirror-scroll')
+            if editor_area.is_visible():
+                editor_area.click()
+            else:
+                page.click('#editor-root') # fallback
+            
+            page.keyboard.insert_text(content)
+            
+            # 6. Click Publish
+            print("Clicking Publish buttons...")
+            page.locator('button:has-text("완료")').last.click()
+            time.sleep(2)
+            
+            # The final modal publish button
+            page.locator('button:has-text("공개 발행")').first.click()
+            
+            # Wait for successful publish navigation
+            page.wait_for_load_state('networkidle')
+            time.sleep(3)
+            print("Successfully published to Tistory via Headless Browser!")
+            
+        except Exception as e:
+            print(f"Error during Playwright execution: {e}")
+            page.screenshot(path="playwright_error.png")
+            print("Saved screenshot to playwright_error.png for debugging.")
+            sys.exit(1)
+        finally:
+            browser.close()
+
 def main():
     if not NVIDIA_API_KEY:
         print("Error: NVIDIA_API_KEY environment variable is not set.")
-        return
+        sys.exit(1)
 
     # 1. Get Keyword
     keyword = get_google_trends_keyword()
@@ -88,8 +199,8 @@ def main():
     try:
         content = generate_blog_post(keyword)
     except Exception as e:
-        print("Failed to generate content. Exiting.")
-        return
+        print(f"Failed to generate content. Exiting. Error: {e}")
+        sys.exit(1)
 
     # 3. Generate Image
     image_url = generate_image_url(keyword)
@@ -111,6 +222,10 @@ def main():
         f.write(final_markdown)
     
     print(f"Successfully generated post: {filename}")
+    
+    # 5. Publish to Tistory via Playwright
+    title = f"{keyword} 완벽 분석 및 총정리"
+    publish_to_tistory(title, final_markdown)
 
 if __name__ == "__main__":
     main()

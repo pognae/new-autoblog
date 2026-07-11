@@ -24,10 +24,14 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        playwright install chromium
 
     - name: Run Autoblog Script
       env:
         NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        KAKAO_EMAIL: ${{ secrets.KAKAO_EMAIL }}
+        KAKAO_PASSWORD: ${{ secrets.KAKAO_PASSWORD }}
+        TISTORY_COOKIES: ${{ secrets.TISTORY_COOKIES }}
       run: |
         python scripts/autoblog.py
 
