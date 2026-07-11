@@ -209,83 +209,69 @@ def publish_to_tistory(title, content):
             
             # 3. Enter Title
             print("Entering title...")
-            page.get_by_placeholder("제목을 입력하세요").fill(title)
+            title_input = page.get_by_placeholder("제목을 입력하세요")
+            title_input.fill(title)
             
             # 4. Switch to Markdown mode
             print("Switching to Markdown mode...")
             try:
-                # Click the mode dropdown button
-                mode_btn = page.locator('#editor-mode-layer-btn-open')
+                mode_btn = page.locator('#editor-mode-layer-btn-open, button:has-text("기본모드")').first
                 if mode_btn.is_visible():
                     mode_btn.click(timeout=5000)
-                else:
-                    page.locator('button:has-text("기본모드")').first.click(timeout=5000)
-                
-                time.sleep(1) # wait for the dropdown animation
-                
-                # Click the Markdown option
-                markdown_btn = page.locator('#editor-mode-markdown')
-                if markdown_btn.is_visible():
-                    markdown_btn.click(timeout=5000)
-                else:
-                    page.locator('button:has-text("마크다운")').first.click(timeout=5000)
-                
-                # IMPORTANT: Wait for the Markdown editor (CodeMirror) to fully load
-                page.wait_for_selector('.CodeMirror-scroll', state='visible', timeout=10000)
-                print("Successfully switched to Markdown mode.")
+                    time.sleep(1)
+                    md_btn = page.locator('#editor-mode-markdown, button:has-text("마크다운")').first
+                    md_btn.click(timeout=5000)
+                    time.sleep(2)
             except Exception as e:
-                print(f"Error switching to Markdown mode: {e}")
-            
-            # 5. Enter Content
+                print(f"Warning: Mode switch failed: {e}")
+                
+            # 5. Enter Content (Using Tab navigation)
             print("Entering content...")
             try:
-                # 1. Try CodeMirror JS API (Most reliable if available)
-                cm_success = page.evaluate('''([text]) => {
+                # 1. Focus the title again
+                title_input.click()
+                time.sleep(0.5)
+                # 2. Press Tab to naturally move focus to the editor body
+                page.keyboard.press("Tab")
+                time.sleep(0.5)
+                
+                # 3. Paste the content using clipboard
+                page.evaluate("navigator.clipboard.writeText(arguments[0])", content)
+                page.keyboard.press("Control+V")
+                time.sleep(2)
+                
+                # Fallback CodeMirror JS API just in case Tab failed
+                page.evaluate('''([text]) => {
                     const cmElement = document.querySelector('.CodeMirror');
                     if (cmElement && cmElement.CodeMirror) {
-                        cmElement.CodeMirror.setValue(text);
-                        return true;
+                        const currentVal = cmElement.CodeMirror.getValue();
+                        if (!currentVal || currentVal.trim() === "") {
+                            cmElement.CodeMirror.setValue(text);
+                        }
                     }
-                    return false;
                 }''', [content])
-                
-                if cm_success:
-                    print("Successfully injected content via CodeMirror API.")
-                else:
-                    # 2. Fallback: Clipboard Paste
-                    print("CodeMirror API not found. Falling back to clipboard paste...")
-                    page.evaluate("navigator.clipboard.writeText(arguments[0])", content)
-                    editor_root = page.locator('#editor-root').first
-                    editor_root.click()
-                    page.keyboard.press('Control+A')
-                    page.keyboard.press('Backspace')
-                    page.keyboard.press('Control+V')
-                    print("Successfully pasted content.")
+                print("Successfully entered content.")
             except Exception as e:
                 print(f"Content insertion failed: {e}")
-            
-            time.sleep(2)
             
             # 5-1. Enter Tags
             print("Entering tags...")
             try:
-                # Tistory tags input usually has id="tagText" or placeholder
-                tag_input = page.locator('#tagText, input[placeholder*="태그"]')
-                if tag_input.count() > 0:
-                    tag_el = tag_input.first
-                    tag_el.scroll_into_view_if_needed()
-                    tag_el.click(timeout=3000)
+                # Broad selector for Tistory tag input
+                tag_input = page.locator('input[type="text"][placeholder*="태그"]').first
+                if tag_input.is_visible():
+                    tag_input.scroll_into_view_if_needed()
+                    tag_input.click(timeout=3000)
                     
                     tags = [keyword.replace(" ", ""), "이슈", "트렌드", "정보", "분석"]
                     for tag in tags:
-                        # Real typing simulation
-                        tag_el.press_sequentially(tag, delay=100)
-                        time.sleep(0.5)
+                        page.keyboard.insert_text(tag)
+                        time.sleep(0.2)
                         page.keyboard.press("Enter")
-                        time.sleep(0.5)
+                        time.sleep(0.2)
                     print("Successfully entered tags.")
                 else:
-                    print("Tag input field not found.")
+                    print("Tag input field not visible.")
             except Exception as e:
                 print(f"Failed to enter tags: {e}")
             
