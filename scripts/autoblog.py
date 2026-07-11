@@ -126,7 +126,7 @@ def publish_to_tistory(title, content):
                     new_c = {
                         'name': str(c.get('name', '')),
                         'value': str(c.get('value', '')),
-                        'url': 'https://gumdrop.tistory.com',
+                        'domain': '.tistory.com',
                         'path': '/'
                     }
                     valid_cookies.append(new_c)
