@@ -187,11 +187,11 @@ def publish_to_tistory(title, content):
             
             # 5. Enter Content
             print("Entering content...")
-            editor_area = page.locator('.CodeMirror-scroll')
+            editor_area = page.locator('.CodeMirror-scroll').first
             if editor_area.is_visible():
                 editor_area.click()
             else:
-                page.click('#editor-root') # fallback
+                page.locator('#editor-root').first.click() # fallback
             
             page.keyboard.insert_text(content)
             
