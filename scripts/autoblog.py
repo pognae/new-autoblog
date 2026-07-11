@@ -3,8 +3,8 @@ import time
 import json
 import requests
 import sys
+import xml.etree.ElementTree as ET
 from datetime import datetime
-from pytrends.request import TrendReq
 from playwright.sync_api import sync_playwright
 
 NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY")
@@ -14,15 +14,29 @@ TISTORY_COOKIES = os.environ.get("TISTORY_COOKIES")
 
 def get_google_trends_keyword():
     try:
-        print("Fetching Google Trends data...")
-        pytrend = TrendReq(hl='ko-KR', tz=540, timeout=(10, 30))
-        trending_searches_df = pytrend.trending_searches(pn='south_korea')
-        keywords = trending_searches_df[0].tolist()
+        print("Fetching Google Trends data via RSS...")
+        url = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=KR"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        root = ET.fromstring(response.content)
+        keywords = []
+        for item in root.findall('.//item'):
+            title = item.find('title')
+            if title is not None:
+                keywords.append(title.text)
+                
         if keywords:
             print(f"Extracted keyword: {keywords[0]}")
             return keywords[0]
         else:
-            raise Exception("No keywords found.")
+            raise Exception("No keywords found in RSS feed.")
+    except requests.exceptions.Timeout:
+        print("TimeoutError: Google Trends RSS request timed out after 30 seconds.")
+        return "자동 포스팅" # Fallback keyword
     except Exception as e:
         print(f"Failed to extract Google realtime keyword: {e}")
         return "자동 포스팅" # Fallback keyword
@@ -63,12 +77,13 @@ def generate_blog_post(keyword):
     }
 
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        print("Sending request to NVIDIA NIM API (timeout=180s)...")
+        response = requests.post(url, headers=headers, json=payload, timeout=180)
         response.raise_for_status()
         data = response.json()
         return data["choices"][0]["message"]["content"]
     except requests.exceptions.Timeout:
-        print("TimeoutError: NVIDIA NIM API request timed out after 60 seconds.")
+        print("TimeoutError: NVIDIA NIM API request timed out after 180 seconds.")
         raise
     except Exception as e:
         print(f"Error generating post: {e}")
