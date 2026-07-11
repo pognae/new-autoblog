@@ -114,15 +114,29 @@ def publish_to_tistory(title, content):
         if TISTORY_COOKIES:
             print("Injecting Tistory cookies for authentication...")
             try:
-                cookies = json.loads(TISTORY_COOKIES)
-                # Ensure the url or domain is properly formatted for Playwright
-                for cookie in cookies:
-                    if 'url' not in cookie:
-                        cookie['url'] = 'https://' + cookie['domain'].lstrip('.')
-                    # Fix Playwright validation error for sameSite
-                    if 'sameSite' in cookie and cookie['sameSite'] not in ['Strict', 'Lax', 'None']:
-                        del cookie['sameSite']
-                context.add_cookies(cookies)
+                raw_cookies = json.loads(TISTORY_COOKIES)
+                valid_cookies = []
+                # If user pasted a single dict instead of list
+                if isinstance(raw_cookies, dict):
+                    raw_cookies = [raw_cookies]
+                    
+                for c in raw_cookies:
+                    # Playwright requires name, value, and either domain or url
+                    new_c = {
+                        'name': c.get('name', ''),
+                        'value': c.get('value', ''),
+                        'path': c.get('path', '/')
+                    }
+                    if c.get('domain'):
+                        new_c['domain'] = c['domain']
+                    elif c.get('url'):
+                        new_c['url'] = c['url']
+                    else:
+                        new_c['domain'] = '.tistory.com'
+                        
+                    valid_cookies.append(new_c)
+                    
+                context.add_cookies(valid_cookies)
             except Exception as e:
                 print(f"Failed to parse TISTORY_COOKIES JSON. Error: {e}")
                 sys.exit(1)
