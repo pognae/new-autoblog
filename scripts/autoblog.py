@@ -48,7 +48,7 @@ def generate_blog_post_gemini(prompt):
         raise Exception("GEMINI_API_KEY environment variable is not set for fallback.")
     
     print("Sending request to Google Gemini API (fallback)...")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
