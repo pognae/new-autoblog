@@ -52,20 +52,25 @@ def generate_blog_post(keyword):
         "accept": "application/json"
     }
 
-    # As per rules: 6000+ characters, Korean only, SEO optimized, heavily use keywords
     prompt = f"""
-당신은 최고의 구글 SEO 전문가이자 전문 블로거입니다.
-다음 키워드를 바탕으로 구글 검색에 최상단 노출될 수 있는 완벽한 블로그 포스팅을 작성해주세요.
+당신은 상위 1% 구글 SEO 전문가이자 프로 블로거입니다.
+주어진 키워드를 주제로, 구글 검색 1위에 무조건 노출될 수 있는 압도적인 퀄리티의 블로그 포스팅을 작성해 주세요.
 
-[키워드]: {keyword}
+[타겟 키워드]: {keyword}
 
-[규칙]
-1. 반드시 한글로만 작성하세요. (외국어 구절이나 영어가 섞이지 않도록 주의할 것, 필요한 명칭 외에는 절대적으로 한국어 사용)
-2. 글의 길이는 6000자 이상으로 매우 길고 상세하게 작성해야 합니다.
-3. '{keyword}' 키워드를 제목과 본문에 자연스럽게, 하지만 최대한 많이 사용하세요.
-4. 마크다운 형식으로 작성하세요.
-5. 중간중간 관련 정보, 팁, 분석 등을 포함하여 깊이 있는 정보를 제공하세요.
-6. 글의 첫 부분에는 이 글의 요약을 제공하고, 마지막에는 결론을 내리세요.
+[필수 준수 규칙]
+1. **분량**: 반드시 6,000자 이상의 매우 긴 장문으로 작성하세요. 내용이 빈약하면 안 됩니다. 서론, 본론(최소 5개 이상의 상세 목차), 결론, Q&A 형식까지 포함하여 최대한 자세하고 정성스럽게 적어주세요.
+2. **언어**: 100% 한국어로만 작성하세요. (부득이한 전문 용어 외에는 영어 사용 엄격히 금지)
+3. **SEO 최적화**: '{keyword}' 키워드를 제목, 소제목(H2, H3), 본문 첫 문단, 본문 중간, 결론에 매우 자연스럽게 20회 이상 반복해서 배치하세요.
+4. **마크다운 포맷**: H1, H2, H3, 리스트(-), 인용구(>) 등을 적극적으로 활용하여 가독성 높고 화려한 마크다운 문서를 만드세요.
+5. **독자 가치 제공**: 단순한 겉핥기식 정보가 아닌, 실제 독자가 읽고 "정말 유용하다"라고 느낄 수 있는 깊이 있는 전문 지식, 구체적인 사례, 실전 팁, 주의사항 등을 꽉꽉 채워 넣으세요.
+6. **목차 구성**:
+   - 도입부 (독자의 흥미 유발 및 핵심 요약)
+   - 주제에 대한 상세한 설명 및 배경지식
+   - 구체적인 장단점, 특징, 또는 활용법 (다양한 관점에서 분석)
+   - 실생활 예시 및 꿀팁 방출
+   - 자주 묻는 질문 (FAQ) 3가지 이상
+   - 최종 결론 및 요약
 """
 
     payload = {
@@ -74,7 +79,7 @@ def generate_blog_post(keyword):
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
-        "max_tokens": 4000
+        "max_tokens": 6000
     }
 
     try:
@@ -242,9 +247,9 @@ def main():
     # Create posts directory if it doesn't exist
     os.makedirs("posts", exist_ok=True)
     
-    # Format the markdown with image
+    # Format the markdown with image using HTML to ensure Tistory renders it correctly
     final_markdown = f"# {keyword} 완벽 분석 및 총정리\n\n"
-    final_markdown += f"![{keyword} SEO Image]({image_url})\n\n"
+    final_markdown += f'<p align="center"><img src="{image_url}" alt="{keyword} SEO Image" style="max-width: 100%; height: auto; border-radius: 8px;" /></p>\n\n'
     final_markdown += content
 
     with open(filename, "w", encoding="utf-8") as f:
