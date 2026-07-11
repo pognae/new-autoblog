@@ -129,10 +129,10 @@ def generate_blog_post(keyword):
         return generate_blog_post_gemini(prompt)
 
 def generate_image_url(keyword):
-    # Using Pollinations AI for free text-to-image without API keys
-    # Replacing spaces with URL-friendly characters
+    # Using Pollinations AI with path parameters to avoid query strings which Tistory's image proxy might block
     encoded_keyword = requests.utils.quote(f"high quality realistic blog cover image for {keyword}")
-    url = f"https://pollinations.ai/p/{encoded_keyword}?width=800&height=400&nologo=true"
+    # Using the direct image endpoint without any query parameters
+    url = f"https://image.pollinations.ai/prompt/{encoded_keyword}"
     return url
 
 def publish_to_tistory(title, content):
@@ -259,15 +259,16 @@ def publish_to_tistory(title, content):
             # 5-1. Enter Tags
             print("Entering tags...")
             try:
-                # Tistory tags input using ARIA role
-                tag_input = page.get_by_role("textbox", name="태그").last
+                # Use a very broad locator for Tistory tags
+                tag_input = page.locator('input[placeholder*="태그"], #tagText').first
                 if tag_input.is_visible():
                     tag_input.scroll_into_view_if_needed()
                     tag_input.click(timeout=3000)
                     
                     tags = [keyword.replace(" ", ""), "이슈", "트렌드", "정보", "분석"]
                     for tag in tags:
-                        tag_input.fill(tag)
+                        tag_input.press_sequentially(tag, delay=100)
+                        time.sleep(0.5)
                         page.keyboard.press("Enter")
                         time.sleep(0.5)
                     print("Successfully entered tags.")
