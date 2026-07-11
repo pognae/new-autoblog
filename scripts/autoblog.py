@@ -132,7 +132,8 @@ def publish_to_tistory(title, content):
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-            locale="ko-KR"
+            locale="ko-KR",
+            permissions=["clipboard-read", "clipboard-write"]
         )
         
         # Inject cookies if provided (Bypasses Login and Captchas completely)
@@ -238,41 +239,48 @@ def publish_to_tistory(title, content):
             # 5. Enter Content
             print("Entering content...")
             try:
-                # CodeMirror uses a hidden textarea for input handling
-                textarea = page.locator('.CodeMirror textarea')
-                textarea.focus(timeout=5000)
-                time.sleep(1)
+                # 1. Try CodeMirror JS API (Most reliable if available)
+                cm_success = page.evaluate('''([text]) => {
+                    const cmElement = document.querySelector('.CodeMirror');
+                    if (cmElement && cmElement.CodeMirror) {
+                        cmElement.CodeMirror.setValue(text);
+                        return true;
+                    }
+                    return false;
+                }''', [content])
                 
-                # Clear any existing text
-                page.keyboard.press('Control+A')
-                page.keyboard.press('Backspace')
-                time.sleep(0.5)
-                
-                # Insert the markdown content
-                page.keyboard.insert_text(content)
-                print("Successfully entered content into CodeMirror.")
-            except Exception as e:
-                print(f"CodeMirror textarea not found, falling back: {e}")
-                try:
-                    editor_root = page.locator('.ProseMirror').first
+                if cm_success:
+                    print("Successfully injected content via CodeMirror API.")
+                else:
+                    # 2. Fallback: Clipboard Paste
+                    print("CodeMirror API not found. Falling back to clipboard paste...")
+                    page.evaluate("navigator.clipboard.writeText(arguments[0])", content)
+                    editor_root = page.locator('#editor-root').first
                     editor_root.click()
                     page.keyboard.press('Control+A')
                     page.keyboard.press('Backspace')
-                    page.keyboard.insert_text(content)
-                except Exception as e2:
-                    print(f"Fallback failed: {e2}")
+                    page.keyboard.press('Control+V')
+                    print("Successfully pasted content.")
+            except Exception as e:
+                print(f"Content insertion failed: {e}")
             
             time.sleep(2)
             
             # 5-1. Enter Tags
             print("Entering tags...")
             try:
-                tag_input = page.locator('input[placeholder*="태그"]')
+                # Tistory tags input usually has id="tagText" or placeholder
+                tag_input = page.locator('#tagText, input[placeholder*="태그"]')
                 if tag_input.count() > 0:
-                    tag_input.first.click(timeout=3000)
+                    tag_el = tag_input.first
+                    tag_el.scroll_into_view_if_needed()
+                    tag_el.click(timeout=3000)
+                    
                     tags = [keyword.replace(" ", ""), "이슈", "트렌드", "정보", "분석"]
                     for tag in tags:
-                        tag_input.first.fill(tag)
+                        # Real typing simulation
+                        tag_el.press_sequentially(tag, delay=100)
+                        time.sleep(0.5)
                         page.keyboard.press("Enter")
                         time.sleep(0.5)
                     print("Successfully entered tags.")
