@@ -6,6 +6,7 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from playwright.sync_api import sync_playwright
+import markdown
 
 NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY")
 KAKAO_EMAIL = os.environ.get("KAKAO_EMAIL")
@@ -208,65 +209,58 @@ def publish_to_tistory(title, content):
             page.on("dialog", handle_dialog)
             # 3. Enter Title
             print("Entering title...")
-            title_input = page.get_by_placeholder("제목을 입력하세요")
+            title_input = page.get_by_role("textbox", name="제목을 입력하세요")
             title_input.fill(title)
             
-            # 4. Switch to Markdown mode
-            print("Switching to Markdown mode...")
-            try:
-                # Click the mode dropdown button
-                mode_btn = page.locator('#editor-mode-layer-btn-open')
-                if mode_btn.is_visible():
-                    mode_btn.click(timeout=5000)
-                else:
-                    page.locator('button:has-text("기본모드")').first.click(timeout=5000)
-                
-                time.sleep(1) # wait for the dropdown animation
-                
-                # Click the Markdown option
-                markdown_btn = page.locator('#editor-mode-markdown')
-                if markdown_btn.is_visible():
-                    markdown_btn.click(timeout=5000)
-                else:
-                    page.locator('button:has-text("마크다운")').first.click(timeout=5000)
-                
-                # IMPORTANT: Wait for the Markdown editor (CodeMirror) to fully load
-                page.wait_for_selector('.CodeMirror-scroll', state='visible', timeout=10000)
-                print("Successfully switched to Markdown mode.")
-            except Exception as e:
-                print(f"Error switching to Markdown mode: {e}")
+            # 4. Convert Markdown to HTML
+            print("Converting Markdown to HTML...")
+            html_content = markdown.markdown(content, extensions=['fenced_code', 'tables', 'extra', 'nl2br'])
             
-            # 5. Enter Content
-            print("Entering content...")
+            # 5. Enter Content using TinyMCE API
+            print("Entering content via TinyMCE...")
             try:
-                editor_area = page.locator('.CodeMirror-scroll').first
-                editor_area.click(timeout=5000)
-                # Clear any existing text
-                page.keyboard.press('Control+A')
-                page.keyboard.press('Backspace')
-            except Exception as e:
-                print("CodeMirror not found, falling back to editor-root...")
-                page.locator('#editor-root').first.click()
+                # Wait for TinyMCE to be ready
+                page.wait_for_function('window.tinymce !== undefined && (window.tinymce.activeEditor || window.tinymce.editors.length > 0)', timeout=15000)
                 
-            page.keyboard.insert_text(content)
+                success = page.evaluate('''([html]) => {
+                    const editor = window.tinymce && (window.tinymce.activeEditor || window.tinymce.editors[0]);
+                    if (!editor) return false;
+                    
+                    editor.setContent(html);
+                    editor.undoManager.add();
+                    editor.setDirty(true);
+                    editor.save();
+                    editor.fire("change");
+                    editor.fire("input");
+                    return true;
+                }''', [html_content])
+                
+                if success:
+                    print("Successfully injected HTML via TinyMCE.")
+                else:
+                    print("Warning: TinyMCE injection returned false.")
+            except Exception as e:
+                print(f"Content insertion failed: {e}")
+            
             time.sleep(2)
             
             # 5-1. Enter Tags
             print("Entering tags...")
             try:
-                tag_input = page.locator('input[placeholder*="태그"]')
-                if tag_input.count() > 0:
-                    tag_input.first.scroll_into_view_if_needed()
-                    tag_input.first.click(timeout=3000)
+                # Tistory tags input using ARIA role
+                tag_input = page.get_by_role("textbox", name="태그").last
+                if tag_input.is_visible():
+                    tag_input.scroll_into_view_if_needed()
+                    tag_input.click(timeout=3000)
                     
                     tags = [keyword.replace(" ", ""), "이슈", "트렌드", "정보", "분석"]
                     for tag in tags:
-                        tag_input.first.fill(tag)
+                        tag_input.fill(tag)
                         page.keyboard.press("Enter")
                         time.sleep(0.5)
                     print("Successfully entered tags.")
                 else:
-                    print("Tag input field not found.")
+                    print("Tag input field not found using role.")
             except Exception as e:
                 print(f"Failed to enter tags: {e}")
             
