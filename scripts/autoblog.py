@@ -15,7 +15,8 @@ TISTORY_COOKIES = os.environ.get("TISTORY_COOKIES")
 def get_google_trends_keyword():
     try:
         print("Fetching Google Trends data via RSS...")
-        url = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=KR"
+        # Using google.co.kr or generic trends
+        url = "https://trends.google.co.kr/trends/trendingsearches/daily/rss?geo=KR"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
         }
@@ -118,6 +119,9 @@ def publish_to_tistory(title, content):
                 for cookie in cookies:
                     if 'url' not in cookie:
                         cookie['url'] = 'https://' + cookie['domain'].lstrip('.')
+                    # Fix Playwright validation error for sameSite
+                    if 'sameSite' in cookie and cookie['sameSite'] not in ['Strict', 'Lax', 'None']:
+                        del cookie['sameSite']
                 context.add_cookies(cookies)
             except Exception as e:
                 print(f"Failed to parse TISTORY_COOKIES JSON. Error: {e}")
