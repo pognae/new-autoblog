@@ -15,8 +15,8 @@ TISTORY_COOKIES = os.environ.get("TISTORY_COOKIES")
 def get_google_trends_keyword():
     try:
         print("Fetching Google Trends data via RSS...")
-        # Using google.co.kr or generic trends
-        url = "https://trends.google.co.kr/trends/trendingsearches/daily/rss?geo=KR"
+        # Using google.com for trends
+        url = "https://trends.google.com/trending/rss?geo=KR"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
         }
@@ -172,8 +172,14 @@ def publish_to_tistory(title, content):
                 print("Error: Redirected to login page. Authentication failed! Check cookies or credentials.")
                 sys.exit(1)
             
-            # Handle possible popup alerts ("임시 저장된 글이 있습니다" 등)
-            page.on("dialog", lambda dialog: dialog.dismiss())
+            # Handle possible popup alerts smartly
+            def handle_dialog(dialog):
+                if "마크다운" in dialog.message or "초기화" in dialog.message or "변경" in dialog.message:
+                    dialog.accept()
+                else:
+                    dialog.dismiss()
+            
+            page.on("dialog", handle_dialog)
             
             # 3. Enter Title
             print("Entering title...")
@@ -186,7 +192,6 @@ def publish_to_tistory(title, content):
                 if mode_btn.is_visible():
                     mode_btn.click(timeout=5000)
                     page.locator('button:has-text("마크다운")').first.click(timeout=5000)
-                    page.on("dialog", lambda dialog: dialog.accept())
             except Exception as e:
                 print(f"Could not switch to Markdown via menu: {e}")
             
@@ -247,9 +252,9 @@ def main():
     # Create posts directory if it doesn't exist
     os.makedirs("posts", exist_ok=True)
     
-    # Format the markdown with image using HTML to ensure Tistory renders it correctly
+    # Format the markdown with image using markdown format
     final_markdown = f"# {keyword} 완벽 분석 및 총정리\n\n"
-    final_markdown += f'<p align="center"><img src="{image_url}" alt="{keyword} SEO Image" style="max-width: 100%; height: auto; border-radius: 8px;" /></p>\n\n'
+    final_markdown += f"![{keyword} SEO Image]({image_url})\n\n"
     final_markdown += content
 
     with open(filename, "w", encoding="utf-8") as f:
