@@ -1,0 +1,116 @@
+import os
+import time
+import json
+import requests
+from datetime import datetime
+from pytrends.request import TrendReq
+
+NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY")
+
+def get_google_trends_keyword():
+    try:
+        print("Fetching Google Trends data...")
+        pytrend = TrendReq(hl='ko-KR', tz=540, timeout=(10, 30))
+        trending_searches_df = pytrend.trending_searches(pn='south_korea')
+        keywords = trending_searches_df[0].tolist()
+        if keywords:
+            print(f"Extracted keyword: {keywords[0]}")
+            return keywords[0]
+        else:
+            raise Exception("No keywords found.")
+    except Exception as e:
+        print(f"Failed to extract Google realtime keyword: {e}")
+        return "자동 포스팅" # Fallback keyword
+
+def generate_blog_post(keyword):
+    print(f"Generating post for keyword: {keyword}")
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    
+    headers = {
+        "Authorization": f"Bearer {NVIDIA_API_KEY}",
+        "Content-Type": "application/json",
+        "accept": "application/json"
+    }
+
+    # As per rules: 6000+ characters, Korean only, SEO optimized, heavily use keywords
+    prompt = f"""
+당신은 최고의 구글 SEO 전문가이자 전문 블로거입니다.
+다음 키워드를 바탕으로 구글 검색에 최상단 노출될 수 있는 완벽한 블로그 포스팅을 작성해주세요.
+
+[키워드]: {keyword}
+
+[규칙]
+1. 반드시 한글로만 작성하세요. (외국어 구절이나 영어가 섞이지 않도록 주의할 것, 필요한 명칭 외에는 절대적으로 한국어 사용)
+2. 글의 길이는 6000자 이상으로 매우 길고 상세하게 작성해야 합니다.
+3. '{keyword}' 키워드를 제목과 본문에 자연스럽게, 하지만 최대한 많이 사용하세요.
+4. 마크다운 형식으로 작성하세요.
+5. 중간중간 관련 정보, 팁, 분석 등을 포함하여 깊이 있는 정보를 제공하세요.
+6. 글의 첫 부분에는 이 글의 요약을 제공하고, 마지막에는 결론을 내리세요.
+"""
+
+    payload = {
+        "model": "meta/llama-3.1-70b-instruct",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 4000
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
+    except requests.exceptions.Timeout:
+        print("TimeoutError: NVIDIA NIM API request timed out after 60 seconds.")
+        raise
+    except Exception as e:
+        print(f"Error generating post: {e}")
+        raise
+
+def generate_image_url(keyword):
+    # Using Pollinations AI for free text-to-image without API keys
+    # Replacing spaces with URL-friendly characters
+    encoded_keyword = requests.utils.quote(f"high quality realistic blog cover image for {keyword}")
+    url = f"https://pollinations.ai/p/{encoded_keyword}?width=800&height=400&nologo=true"
+    return url
+
+def main():
+    if not NVIDIA_API_KEY:
+        print("Error: NVIDIA_API_KEY environment variable is not set.")
+        return
+
+    # 1. Get Keyword
+    keyword = get_google_trends_keyword()
+
+    # 2. Generate Content
+    try:
+        content = generate_blog_post(keyword)
+    except Exception as e:
+        print("Failed to generate content. Exiting.")
+        return
+
+    # 3. Generate Image
+    image_url = generate_image_url(keyword)
+    
+    # 4. Construct Final Post
+    today = datetime.now().strftime("%Y-%m-%d")
+    title_keyword = keyword.replace(" ", "-")
+    filename = f"posts/{today}-{title_keyword}.md"
+    
+    # Create posts directory if it doesn't exist
+    os.makedirs("posts", exist_ok=True)
+    
+    # Format the markdown with image
+    final_markdown = f"# {keyword} 완벽 분석 및 총정리\n\n"
+    final_markdown += f"![{keyword} SEO Image]({image_url})\n\n"
+    final_markdown += content
+
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(final_markdown)
+    
+    print(f"Successfully generated post: {filename}")
+
+if __name__ == "__main__":
+    main()
