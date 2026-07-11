@@ -188,21 +188,40 @@ def publish_to_tistory(title, content):
             # 4. Switch to Markdown mode
             print("Switching to Markdown mode...")
             try:
-                mode_btn = page.locator('button:has-text("기본모드")').first
+                # Click the mode dropdown button
+                mode_btn = page.locator('#editor-mode-layer-btn-open')
                 if mode_btn.is_visible():
                     mode_btn.click(timeout=5000)
+                else:
+                    page.locator('button:has-text("기본모드")').first.click(timeout=5000)
+                
+                time.sleep(1) # wait for the dropdown animation
+                
+                # Click the Markdown option
+                markdown_btn = page.locator('#editor-mode-markdown')
+                if markdown_btn.is_visible():
+                    markdown_btn.click(timeout=5000)
+                else:
                     page.locator('button:has-text("마크다운")').first.click(timeout=5000)
+                
+                # IMPORTANT: Wait for the Markdown editor (CodeMirror) to fully load
+                page.wait_for_selector('.CodeMirror-scroll', state='visible', timeout=10000)
+                print("Successfully switched to Markdown mode.")
             except Exception as e:
-                print(f"Could not switch to Markdown via menu: {e}")
+                print(f"Error switching to Markdown mode: {e}")
             
             # 5. Enter Content
             print("Entering content...")
-            editor_area = page.locator('.CodeMirror-scroll').first
-            if editor_area.is_visible():
-                editor_area.click()
-            else:
-                page.locator('#editor-root').first.click() # fallback
-            
+            try:
+                editor_area = page.locator('.CodeMirror-scroll').first
+                editor_area.click(timeout=5000)
+                # Clear any existing text
+                page.keyboard.press('Control+A')
+                page.keyboard.press('Backspace')
+            except Exception as e:
+                print("CodeMirror not found, falling back to editor-root...")
+                page.locator('#editor-root').first.click()
+                
             page.keyboard.insert_text(content)
             
             # 6. Click Publish
