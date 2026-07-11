@@ -6,7 +6,6 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from playwright.sync_api import sync_playwright
-import markdown
 
 NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY")
 KAKAO_EMAIL = os.environ.get("KAKAO_EMAIL")
@@ -212,83 +211,57 @@ def publish_to_tistory(title, content):
             title_input = page.get_by_placeholder("제목을 입력하세요")
             title_input.fill(title)
             
-            # Convert Markdown to HTML
-            print("Converting Markdown to HTML...")
-            html_content = markdown.markdown(content, extensions=['fenced_code', 'tables'])
-            
-            # 4. Switch to HTML mode
-            print("Switching to HTML mode...")
+            # 4. Switch to Markdown mode
+            print("Switching to Markdown mode...")
             try:
-                mode_btn = page.locator('#editor-mode-layer-btn-open, button:has-text("기본모드")').first
+                # Click the mode dropdown button
+                mode_btn = page.locator('#editor-mode-layer-btn-open')
                 if mode_btn.is_visible():
                     mode_btn.click(timeout=5000)
-                    time.sleep(1)
-                    html_btn = page.locator('#editor-mode-html, button:has-text("HTML")').first
-                    html_btn.click(timeout=5000)
-                    time.sleep(2)
-            except Exception as e:
-                print(f"Warning: Mode switch failed: {e}")
-                
-            # 5. Enter Content (Using JS Injection in HTML mode)
-            print("Entering content in HTML mode...")
-            try:
-                success = page.evaluate('''([html_str]) => {
-                    // Try CodeMirror API first
-                    const cmElement = document.querySelector('.CodeMirror');
-                    if (cmElement && cmElement.CodeMirror) {
-                        cmElement.CodeMirror.setValue(html_str);
-                        return true;
-                    }
-                    // Try raw textarea
-                    const textarea = document.querySelector('textarea.txc-textarea, textarea.editor-html, textarea.CodeMirror-line');
-                    if (textarea) {
-                        // Bypass React setter
-                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-                        if (nativeInputValueSetter) {
-                            nativeInputValueSetter.call(textarea, html_str);
-                        } else {
-                            textarea.value = html_str;
-                        }
-                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                        textarea.dispatchEvent(new Event('change', { bubbles: true }));
-                        return true;
-                    }
-                    return false;
-                }''', [html_content])
-                
-                if success:
-                    print("Successfully injected HTML content.")
                 else:
-                    # Fallback to Playwright fill
-                    print("JS injection returned false, trying Playwright fill...")
-                    page.locator('.CodeMirror textarea, textarea').first.fill(html_content)
+                    page.locator('button:has-text("기본모드")').first.click(timeout=5000)
+                
+                time.sleep(1) # wait for the dropdown animation
+                
+                # Click the Markdown option
+                markdown_btn = page.locator('#editor-mode-markdown')
+                if markdown_btn.is_visible():
+                    markdown_btn.click(timeout=5000)
+                else:
+                    page.locator('button:has-text("마크다운")').first.click(timeout=5000)
+                
+                # IMPORTANT: Wait for the Markdown editor (CodeMirror) to fully load
+                page.wait_for_selector('.CodeMirror-scroll', state='visible', timeout=10000)
+                print("Successfully switched to Markdown mode.")
             except Exception as e:
-                print(f"Content insertion failed: {e}")
+                print(f"Error switching to Markdown mode: {e}")
             
-            # Switch back to Basic Mode so tags and UI update correctly before publishing
-            print("Switching back to Basic mode...")
+            # 5. Enter Content
+            print("Entering content...")
             try:
-                mode_btn = page.locator('#editor-mode-layer-btn-open, button:has-text("HTML")').first
-                if mode_btn.is_visible():
-                    mode_btn.click(timeout=5000)
-                    time.sleep(1)
-                    basic_btn = page.locator('#editor-mode-default, button:has-text("기본모드")').first
-                    basic_btn.click(timeout=5000)
-                    time.sleep(2)
+                editor_area = page.locator('.CodeMirror-scroll').first
+                editor_area.click(timeout=5000)
+                # Clear any existing text
+                page.keyboard.press('Control+A')
+                page.keyboard.press('Backspace')
             except Exception as e:
-                print(f"Warning: Mode switch back failed: {e}")
+                print("CodeMirror not found, falling back to editor-root...")
+                page.locator('#editor-root').first.click()
+                
+            page.keyboard.insert_text(content)
+            time.sleep(2)
             
             # 5-1. Enter Tags
             print("Entering tags...")
             try:
-                tags = [keyword.replace(" ", ""), "이슈", "트렌드", "정보", "분석"]
-                # Tistory tags input usually has id="tagText"
-                tag_input = page.locator('#tagText, input[placeholder*="태그"]').first
-                if tag_input.is_visible():
-                    tag_input.scroll_into_view_if_needed()
-                    tag_input.click(timeout=3000)
+                tag_input = page.locator('input[placeholder*="태그"]')
+                if tag_input.count() > 0:
+                    tag_input.first.scroll_into_view_if_needed()
+                    tag_input.first.click(timeout=3000)
+                    
+                    tags = [keyword.replace(" ", ""), "이슈", "트렌드", "정보", "분석"]
                     for tag in tags:
-                        tag_input.fill(tag)
+                        tag_input.first.fill(tag)
                         page.keyboard.press("Enter")
                         time.sleep(0.5)
                     print("Successfully entered tags.")
