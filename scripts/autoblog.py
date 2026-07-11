@@ -6,6 +6,7 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from playwright.sync_api import sync_playwright
+import markdown
 
 NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY")
 KAKAO_EMAIL = os.environ.get("KAKAO_EMAIL")
@@ -206,72 +207,93 @@ def publish_to_tistory(title, content):
                     dialog.dismiss()
             
             page.on("dialog", handle_dialog)
-            
             # 3. Enter Title
             print("Entering title...")
             title_input = page.get_by_placeholder("제목을 입력하세요")
             title_input.fill(title)
             
-            # 4. Switch to Markdown mode
-            print("Switching to Markdown mode...")
+            # Convert Markdown to HTML
+            print("Converting Markdown to HTML...")
+            html_content = markdown.markdown(content, extensions=['fenced_code', 'tables'])
+            
+            # 4. Switch to HTML mode
+            print("Switching to HTML mode...")
             try:
                 mode_btn = page.locator('#editor-mode-layer-btn-open, button:has-text("기본모드")').first
                 if mode_btn.is_visible():
                     mode_btn.click(timeout=5000)
                     time.sleep(1)
-                    md_btn = page.locator('#editor-mode-markdown, button:has-text("마크다운")').first
-                    md_btn.click(timeout=5000)
+                    html_btn = page.locator('#editor-mode-html, button:has-text("HTML")').first
+                    html_btn.click(timeout=5000)
                     time.sleep(2)
             except Exception as e:
                 print(f"Warning: Mode switch failed: {e}")
                 
-            # 5. Enter Content (Using Tab navigation)
-            print("Entering content...")
+            # 5. Enter Content (Using JS Injection in HTML mode)
+            print("Entering content in HTML mode...")
             try:
-                # 1. Focus the title again
-                title_input.click()
-                time.sleep(0.5)
-                # 2. Press Tab to naturally move focus to the editor body
-                page.keyboard.press("Tab")
-                time.sleep(0.5)
-                
-                # 3. Paste the content using clipboard
-                page.evaluate("navigator.clipboard.writeText(arguments[0])", content)
-                page.keyboard.press("Control+V")
-                time.sleep(2)
-                
-                # Fallback CodeMirror JS API just in case Tab failed
-                page.evaluate('''([text]) => {
+                success = page.evaluate('''([html_str]) => {
+                    // Try CodeMirror API first
                     const cmElement = document.querySelector('.CodeMirror');
                     if (cmElement && cmElement.CodeMirror) {
-                        const currentVal = cmElement.CodeMirror.getValue();
-                        if (!currentVal || currentVal.trim() === "") {
-                            cmElement.CodeMirror.setValue(text);
-                        }
+                        cmElement.CodeMirror.setValue(html_str);
+                        return true;
                     }
-                }''', [content])
-                print("Successfully entered content.")
+                    // Try raw textarea
+                    const textarea = document.querySelector('textarea.txc-textarea, textarea.editor-html, textarea.CodeMirror-line');
+                    if (textarea) {
+                        // Bypass React setter
+                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                        if (nativeInputValueSetter) {
+                            nativeInputValueSetter.call(textarea, html_str);
+                        } else {
+                            textarea.value = html_str;
+                        }
+                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+                        return true;
+                    }
+                    return false;
+                }''', [html_content])
+                
+                if success:
+                    print("Successfully injected HTML content.")
+                else:
+                    # Fallback to Playwright fill
+                    print("JS injection returned false, trying Playwright fill...")
+                    page.locator('.CodeMirror textarea, textarea').first.fill(html_content)
             except Exception as e:
                 print(f"Content insertion failed: {e}")
+            
+            # Switch back to Basic Mode so tags and UI update correctly before publishing
+            print("Switching back to Basic mode...")
+            try:
+                mode_btn = page.locator('#editor-mode-layer-btn-open, button:has-text("HTML")').first
+                if mode_btn.is_visible():
+                    mode_btn.click(timeout=5000)
+                    time.sleep(1)
+                    basic_btn = page.locator('#editor-mode-default, button:has-text("기본모드")').first
+                    basic_btn.click(timeout=5000)
+                    time.sleep(2)
+            except Exception as e:
+                print(f"Warning: Mode switch back failed: {e}")
             
             # 5-1. Enter Tags
             print("Entering tags...")
             try:
-                # Broad selector for Tistory tag input
-                tag_input = page.locator('input[type="text"][placeholder*="태그"]').first
+                tags = [keyword.replace(" ", ""), "이슈", "트렌드", "정보", "분석"]
+                # Tistory tags input usually has id="tagText"
+                tag_input = page.locator('#tagText, input[placeholder*="태그"]').first
                 if tag_input.is_visible():
                     tag_input.scroll_into_view_if_needed()
                     tag_input.click(timeout=3000)
-                    
-                    tags = [keyword.replace(" ", ""), "이슈", "트렌드", "정보", "분석"]
                     for tag in tags:
-                        page.keyboard.insert_text(tag)
-                        time.sleep(0.2)
+                        tag_input.fill(tag)
                         page.keyboard.press("Enter")
-                        time.sleep(0.2)
+                        time.sleep(0.5)
                     print("Successfully entered tags.")
                 else:
-                    print("Tag input field not visible.")
+                    print("Tag input field not found.")
             except Exception as e:
                 print(f"Failed to enter tags: {e}")
             
