@@ -49,21 +49,33 @@ def generate_blog_post_gemini(prompt):
         raise Exception("GEMINI_API_KEY environment variable is not set for fallback.")
     
     print("Sending request to Google Gemini API (fallback)...")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key={GEMINI_API_KEY}"
-    headers = {"Content-Type": "application/json"}
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.7}
-    }
     
-    response = requests.post(url, headers=headers, json=payload, timeout=180)
-    response.raise_for_status()
-    data = response.json()
-    try:
-        return data["candidates"][0]["content"]["parts"][0]["text"]
-    except (KeyError, IndexError) as e:
-        print(f"Failed to parse Gemini response: {data}")
-        raise
+    models_to_try = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"]
+    last_error = None
+    
+    for model in models_to_try:
+        print(f"Trying Gemini model: {model}...")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.7}
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=180)
+        
+        if response.status_code == 200:
+            data = response.json()
+            try:
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+            except (KeyError, IndexError) as e:
+                print(f"Failed to parse Gemini response for {model}: {data}")
+                raise
+        else:
+            print(f"Model {model} failed with status {response.status_code}: {response.text}")
+            last_error = f"{response.status_code} Error for {model}"
+            
+    raise Exception(f"All Gemini models failed. Last error: {last_error}")
 
 def generate_blog_post(keyword):
     print(f"Generating post for keyword: {keyword}")
