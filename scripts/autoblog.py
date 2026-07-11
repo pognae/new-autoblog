@@ -131,6 +131,7 @@ def publish_to_tistory(title, content):
                     }
                     valid_cookies.append(new_c)
                     
+                print(f"DEBUG valid_cookies: {valid_cookies}")
                 context.add_cookies(valid_cookies)
             except Exception as e:
                 print(f"Failed to parse TISTORY_COOKIES JSON. Error: {e}")
