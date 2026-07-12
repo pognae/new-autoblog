@@ -210,7 +210,7 @@ def publish_to_tistory(title, content):
                 
                 print("Navigating to Tistory login...")
                 page.goto("https://www.tistory.com/auth/login")
-                page.get_by_text("카카오계정으로 로그인").click()
+                page.locator('.btn_login').click()
                 
                 print("Entering Kakao credentials...")
                 page.wait_for_selector('input[name="loginId"]', timeout=10000)
