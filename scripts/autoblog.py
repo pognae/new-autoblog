@@ -205,8 +205,8 @@ def publish_to_tistory(title, content):
                     print("Error: KAKAO_EMAIL and KAKAO_PASSWORD are required for fallback login.")
                     sys.exit(1)
                 
-                from playwright_stealth import stealth_sync
-                stealth_sync(page)
+                from playwright_stealth import Stealth
+                Stealth().apply_stealth_sync(page)
                 
                 print("Navigating to Tistory login...")
                 page.goto("https://www.tistory.com/auth/login")
