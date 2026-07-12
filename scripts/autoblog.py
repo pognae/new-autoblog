@@ -50,7 +50,7 @@ def generate_blog_post_gemini(prompt):
     
     print("Sending request to Google Gemini API (fallback)...")
     
-    models_to_try = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"]
+    models_to_try = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-pro"]
     last_error = None
     
     for model in models_to_try:
