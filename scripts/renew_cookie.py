@@ -46,8 +46,8 @@ def renew_tistory_cookies():
             
             print("Waiting for login to complete... (If Captcha appears, please solve it in the browser!)")
             
-            # Wait for either successful login (main page) or a specific element
-            page.wait_for_url(lambda url: "tistory.com" in url and "auth/login" not in url, timeout=60000)
+            from urllib.parse import urlparse
+            page.wait_for_url(lambda url: urlparse(url).netloc.endswith("tistory.com") and "auth/login" not in url, timeout=60000)
             time.sleep(3) # Give it a moment to set all cookies
             
             # Check if login was successful by navigating to write page
