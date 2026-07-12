@@ -22,18 +22,21 @@ def main():
         
         valid_cookies = []
         for c in raw_cookies:
-            domain = c.get('domain', '.tistory.com')
-            if domain == 'tistory.com':
-                domain = '.tistory.com'
-            valid_cookies.append({
+            # We must provide exactly one of url or domain. 
+            # If domain is used, Playwright might not attach it when we navigate. 
+            # Let's try url.
+            cookie_dict = {
                 'name': str(c.get('name', '')),
                 'value': str(c.get('value', '')),
-                'domain': domain,
-                'path': c.get('path', '/')
-            })
+                'url': 'https://gumdrop.tistory.com'
+            }
+            valid_cookies.append(cookie_dict)
             
         context.add_cookies(valid_cookies)
         page = context.new_page()
+        page.goto("https://www.tistory.com/")
+        page.wait_for_load_state('networkidle')
+        time.sleep(2)
         page.goto("https://gumdrop.tistory.com/manage/post")
         page.wait_for_load_state('networkidle')
         time.sleep(5)

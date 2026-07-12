@@ -1,4 +1,5 @@
 requests
 python-dateutil
 playwright
+playwright-stealth
 markdown

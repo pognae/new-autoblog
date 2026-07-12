@@ -136,7 +136,15 @@ def generate_image_url(keyword):
     return url
 
 def publish_to_tistory(title, content):
-    if not TISTORY_COOKIES and (not KAKAO_EMAIL or not KAKAO_PASSWORD):
+    cookies_data = TISTORY_COOKIES
+    if not cookies_data and os.path.exists("tistory_cookies.json"):
+        try:
+            with open("tistory_cookies.json", "r", encoding="utf-8") as f:
+                cookies_data = f.read()
+        except Exception as e:
+            print(f"Failed to load local tistory_cookies.json: {e}")
+            
+    if not cookies_data and (not KAKAO_EMAIL or not KAKAO_PASSWORD):
         print("Error: Either TISTORY_COOKIES or KAKAO credentials must be set.")
         sys.exit(1)
         
@@ -150,10 +158,10 @@ def publish_to_tistory(title, content):
         )
         
         # Inject cookies if provided (Bypasses Login and Captchas completely)
-        if TISTORY_COOKIES:
+        if cookies_data:
             print("Injecting Tistory cookies for authentication...")
             try:
-                raw_cookies = json.loads(TISTORY_COOKIES)
+                raw_cookies = json.loads(cookies_data)
                 valid_cookies = []
                 # If user pasted a single dict instead of list
                 if isinstance(raw_cookies, dict):
@@ -178,14 +186,28 @@ def publish_to_tistory(title, content):
                 print(f"DEBUG valid_cookies: {valid_cookies}")
                 context.add_cookies(valid_cookies)
             except Exception as e:
-                print(f"Failed to parse TISTORY_COOKIES JSON. Error: {e}")
+                print(f"Failed to parse cookies data JSON. Error: {e}")
                 sys.exit(1)
                 
         page = context.new_page()
         
         try:
-            # 1. Login (Only if no cookies are provided)
-            if not TISTORY_COOKIES:
+            # 2. Go to Write Page
+            print("Navigating to the write page...")
+            page.goto("https://gumdrop.tistory.com/manage/post")
+            page.wait_for_load_state('networkidle')
+            time.sleep(3) # Wait for editor to load
+            
+            # Check if login was successful
+            if "login" in page.url:
+                print("Cookies expired, invalid, or missing. Falling back to ID/PW Kakao login with Stealth...")
+                if not KAKAO_EMAIL or not KAKAO_PASSWORD:
+                    print("Error: KAKAO_EMAIL and KAKAO_PASSWORD are required for fallback login.")
+                    sys.exit(1)
+                
+                from playwright_stealth import stealth_sync
+                stealth_sync(page)
+                
                 print("Navigating to Tistory login...")
                 page.goto("https://www.tistory.com/auth/login")
                 page.get_by_text("카카오계정 로그인").click()
@@ -199,17 +221,24 @@ def publish_to_tistory(title, content):
                 print("Waiting for login completion...")
                 page.wait_for_load_state('networkidle')
                 time.sleep(3)
-            
-            # 2. Go to Write Page
-            print("Navigating to the write page...")
-            page.goto("https://gumdrop.tistory.com/manage/post")
-            page.wait_for_load_state('networkidle')
-            time.sleep(3) # Wait for editor to load
-            
-            # Check if login was successful
-            if "login" in page.url:
-                print("Error: Redirected to login page. Authentication failed! Check cookies or credentials.")
-                sys.exit(1)
+                
+                # Go to write page again
+                print("Navigating to the write page after fallback login...")
+                page.goto("https://gumdrop.tistory.com/manage/post")
+                page.wait_for_load_state('networkidle')
+                time.sleep(3)
+                
+                if "login" in page.url:
+                    print("Error: Fallback login also failed. Check Kakao credentials or Captcha.")
+                    sys.exit(1)
+                else:
+                    print("Fallback login successful. Saving new cookies to tistory_cookies.json...")
+                    new_cookies = context.cookies()
+                    try:
+                        with open("tistory_cookies.json", "w", encoding="utf-8") as f:
+                            json.dump(new_cookies, f)
+                    except Exception as e:
+                        print(f"Failed to save new cookies: {e}")
             
             # Handle possible popup alerts smartly
             def handle_dialog(dialog):
