@@ -88,24 +88,27 @@ def generate_blog_post(keyword):
     }
 
     prompt = f"""
-당신은 상위 1% 구글 SEO 전문가이자 프로 블로거입니다.
-주어진 키워드를 주제로, 구글 검색 1위에 무조건 노출될 수 있는 압도적인 퀄리티의 블로그 포스팅을 작성해 주세요.
+당신은 상위 0.1% 구글 SEO 전문가이자 수만 명의 구독자를 보유한 베테랑 전문 블로거입니다.
+주어진 키워드를 주제로, 구글 검색 1위에 노출될 수 있는 압도적인 퀄리티의 블로그 포스팅을 작성해 주세요.
 
 [타겟 키워드]: {keyword}
 
+[핵심 미션: Google E-E-A-T 준수]
+1. **Experience (경험)**: 글 전체에서 필자가 직접 이 제품/서비스를 사용해 보거나 해당 이슈를 직접 겪어본 듯한 1인칭 시점의 생생한 어투를 사용하세요. (예: "제가 직접 확인해보니...", "실제로 사용해보니 이런 점이...")
+2. **Expertise (전문성)**: 단순한 뉴스 나열이 아닌, 해당 분야의 깊이 있는 지식을 바탕으로 한 상세한 분석과 통찰력을 제공하세요.
+3. **Authoritativeness (권위성)**: 구조적이고 체계적인 목차 구성을 통해 신뢰할 수 있는 정보를 제공하세요.
+4. **Trustworthiness (신뢰성)**: 과장된 표현이나 낚시성 내용은 지양하고, 독자에게 진정으로 도움이 되는 팁과 한계점, 주의사항을 솔직하게 기술하세요.
+
+[E-E-A-T 상세 가이드라인 (중요)]
+- **독창적인 콘텐츠(Originality)**: 다른 블로그나 뉴스 내용을 단순 짜깁기하지 마세요. 자신만의 팁, 직접 겪은 후기, 차별화된 통계 분석 등을 반드시 포함하여 독창적으로 작성하세요.
+- **정확한 정보와 출처**: 금융이나 건강 관련 주제 등 정확성이 요구되는 내용은 신뢰할 수 있는 기관의 자료를 명확히 인용하거나 출처를 밝혀 정확한 정보를 제공하세요.
+
 [필수 준수 규칙]
 1. **분량**: 반드시 6,000자 이상의 매우 긴 장문으로 작성하세요. 내용이 빈약하면 안 됩니다. 서론, 본론(최소 5개 이상의 상세 목차), 결론, Q&A 형식까지 포함하여 최대한 자세하고 정성스럽게 적어주세요.
-2. **언어**: 100% 한국어로만 작성하세요. (부득이한 전문 용어 외에는 영어 사용 엄격히 금지)
+2. **언어**: **100% 한국어로만 작성하세요.** 부득이한 고유명사나 모델명(예: iPhone, Galaxy)을 제외하고는 모든 전문 용어를 한국어로 풀어서 설명하거나 한글로만 표기하세요. 영어 단어가 문장 속에 섞여 들어가는 것을 엄격히 금지합니다.
 3. **SEO 최적화**: '{keyword}' 키워드를 제목, 소제목(H2, H3), 본문 첫 문단, 본문 중간, 결론에 매우 자연스럽게 20회 이상 반복해서 배치하세요.
 4. **마크다운 포맷**: H1, H2, H3, 리스트(-), 인용구(>) 등을 적극적으로 활용하여 가독성 높고 화려한 마크다운 문서를 만드세요.
-5. **독자 가치 제공**: 단순한 겉핥기식 정보가 아닌, 실제 독자가 읽고 "정말 유용하다"라고 느낄 수 있는 깊이 있는 전문 지식, 구체적인 사례, 실전 팁, 주의사항 등을 꽉꽉 채워 넣으세요.
-6. **목차 구성**:
-   - 도입부 (독자의 흥미 유발 및 핵심 요약)
-   - 주제에 대한 상세한 설명 및 배경지식
-   - 구체적인 장단점, 특징, 또는 활용법 (다양한 관점에서 분석)
-   - 실생활 예시 및 꿀팁 방출
-   - 자주 묻는 질문 (FAQ) 3가지 이상
-   - 최종 결론 및 요약
+5. **독자 가치 제공**: 단순한 겉핥기식 정보가 아닌, 실제 독자가 읽고 "정말 유용하다"라고 느낄 수 있는 실전 팁, 주의사항, FAQ를 꽉꽉 채워 넣으세요.
 """
 
     payload = {
@@ -127,6 +130,57 @@ def generate_blog_post(keyword):
         print(f"NVIDIA API failed or timed out: {e}")
         print("Falling back to Google Gemini API...")
         return generate_blog_post_gemini(prompt)
+
+def validate_and_fix_post(keyword, content):
+    print(f"Auditing post for E-E-A-T and Korean-only compliance...")
+    
+    audit_prompt = f"""
+당신은 구글 검색 품질 평가자이자 전문 교정 작가입니다. 
+다음 블로그 포스팅이 구글 E-E-A-T 가이드라인을 준수하는지, 그리고 100% 한국어(영어 혼용 없음)로 작성되었는지 정밀 점검하고 교정해 주세요.
+
+[대상 포스팅]
+키워드: {keyword}
+본문 내용:
+{content}
+
+[점검 및 교정 가이드라인]
+1. **E-E-A-T 및 위반사항 점검 (재발 방지)**: 
+   - **단순 짜깁기 확인**: 기존 뉴스를 단순히 복사하거나 짜깁기한 느낌이 든다면, '나만의 팁', '경험담', '인사이트' 등을 추가하여 독창적인 콘텐츠로 완전히 탈바꿈시키세요.
+   - **출처 및 신뢰도 점검**: 주관적인 주장이나 사실 확인이 필요한 정보(특히 금융, 건강 관련)에는 신뢰할 수 있는 기관/출처를 덧붙이는 문구를 추가하여 권위성(Authoritativeness)을 높이세요.
+   - 'Experience'가 부족하다면(3인칭 관찰자 시점 등), 필자가 직접 경험하고 확인한 듯한 1인칭 어투("제가 직접 확인해본 결과", "실제로 사용해보니")로 문장을 수정하세요.
+   - 'Trustworthiness'를 위해 과장된 표현이나 낚시성 문구를 담백하고 신뢰감 있는 톤으로 조정하세요.
+2. **100% 한국어 원칙**:
+   - 문장 중간에 섞여 있는 영어 단어(예: "Review를 해보겠습니다", "Key 포인트는")를 모두 자연스러운 한글("리뷰를 해보겠습니다", "핵심 포인트는")로 변경하세요.
+   - 단, 모델명이나 브랜드명 등 고유명사는 유지해도 되지만, 일반 명사는 반드시 한글로 교체하세요.
+3. **SEO 및 가독성 유지**: 마크다운 구조와 키워드 밀도는 유지하면서 내용의 질을 높이세요.
+
+[출력 형식]
+반드시 수정이 완료된 최종 마크다운 본문만 출력하세요. 다른 설명이나 인사말은 일절 생략하세요.
+"""
+
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {NVIDIA_API_KEY}",
+        "Content-Type": "application/json",
+        "accept": "application/json"
+    }
+    payload = {
+        "model": "meta/llama-3.1-70b-instruct",
+        "messages": [
+            {"role": "user", "content": audit_prompt}
+        ],
+        "temperature": 0.5, # Lower temperature for precision
+        "max_tokens": 6000
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=180)
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"Audit failed: {e}. Returning original content.")
+        return content
 
 def generate_image_url(keyword):
     # Using Pollinations AI with path parameters to avoid query strings which Tistory's image proxy might block
@@ -338,6 +392,11 @@ def main():
     # 2. Generate Content
     try:
         content = generate_blog_post(keyword)
+        
+        # 2-1. E-E-A-T and Korean-only Validation
+        print(f"Applying E-E-A-T & Korean-only validation logic...")
+        content = validate_and_fix_post(keyword, content)
+            
     except Exception as e:
         print(f"Failed to generate content. Exiting. Error: {e}")
         sys.exit(1)
